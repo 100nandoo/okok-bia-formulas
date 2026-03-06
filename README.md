@@ -100,3 +100,23 @@ Contributions are welcome! If you have any information to add or corrections to 
 ## License
 
 This project is licensed under the terms of the LICENSE file.
+
+## macOS Shortcut Integration
+
+You can trigger a weight scan directly from a **macOS Shortcut** or via your menu bar.
+
+1.  **Modify the wrapper script**: Open `run_shortcut.sh` and update your `HEIGHT`, `AGE`, and `SEX`.
+2.  **Open "Shortcuts" App** on your Mac.
+3.  **Create a New Shortcut**:
+    - Click `+` (New Shortcut).
+    - Name it something like "Log Weight".
+    - Search for the action: **"Run Shell Script"**.
+    - In the text box, paste the following:
+      ```bash
+      ~/okok-bia-formulas/run_shortcut.sh
+      ```
+    - (Optional) Check "Show in Menu Bar" in the Shortcut settings (right sidebar).
+4.  **How to use**:
+    - Trigger the shortcut (from menu bar or a keyboard shortcut).
+    - Step on your scale.
+    - A notification will appear once the data is captured and saved.

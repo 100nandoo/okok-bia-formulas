@@ -386,7 +386,35 @@ def print_reading(
     weight_kg: float,
     impedance: Optional[float],
     bc: Optional[BodyComposition],
+    output_format: str = "default",
+    profile: Optional[UserProfile] = None,
 ) -> None:
+    if output_format == "mac":
+        print("<b>Profile</b>")
+        if profile:
+            print(f"{'height':<10}: {profile.height:.0f} cm")
+            print(f"{'age':<10}: {profile.age}")
+            print(f"{'sex':<10}: {'male' if profile.is_male else 'female'}")
+        else:
+            print("No profile provided")
+
+        print("\n<b>Details</b>")
+        imp = f"{impedance:.1f} Ω" if impedance is not None else "—"
+        print(f"{'Weight':<10}: {weight_kg:.2f} kg")
+        print(f"{'Impedance':<10}: {imp}")
+        if bc:
+            vfr_str = f"{bc.vfr:.1f}" if bc.vfr is not None else "—"
+            tfr_str = f"{bc.tfr:.1f}%" if bc.tfr is not None else "—"
+            print(f"{'BMI':<10}: {bc.bmi:.1f}")
+            print(f"{'Body Fat':<10}: {bc.bfr:.1f}%")
+            print(f"{'Visc Fat':<10}: {vfr_str}")
+            print(f"{'Water':<10}: {tfr_str}")
+            print(f"{'Muscle':<10}: {bc.muscle_kg:.2f} kg ({bc.muscle_pct:.1f}%)")
+            print(f"{'Bone Mass':<10}: {bc.bone_mass:.2f} kg")
+            print(f"{'BMR':<10}: {bc.bmr:.0f} kcal")
+            print(f"{'Body Age':<10}: {bc.body_age:.0f}")
+        return
+
     ts   = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     imp  = f"{impedance:.1f} Ω" if impedance is not None else "—"
     print(f"\n{'─'*55}")
@@ -442,13 +470,15 @@ async def run(args: argparse.Namespace) -> None:
             age=args.age,
             is_male=(args.sex.lower() in {"male", "m", "1"}),
         )
-        print(f"User profile → height={args.height} cm, age={args.age}, "
-              f"sex={'male' if profile.is_male else 'female'}")
-    else:
+        if args.output != "mac":
+            print(f"User profile → height={args.height} cm, age={args.age}, "
+                  f"sex={'male' if profile.is_male else 'female'}")
+    elif args.output != "mac":
         print("No user profile provided — BIA body composition will be skipped.")
         print("Pass --height <cm> --age <years> --sex male|female to enable it.")
 
-    print("\nScanning for OKOK BLE scale advertisements…\n")
+    if args.output != "mac":
+        print("\nScanning for OKOK BLE scale advertisements…\n")
     seen: set[str] = set()
     stop_event = asyncio.Event()
 
@@ -479,11 +509,12 @@ async def run(args: argparse.Namespace) -> None:
         if profile and impedance is not None:
             bc = calc_bia(profile, weight_kg, impedance)
 
-        print_reading(device, variant, weight_kg, impedance, bc)
+        print_reading(device, variant, weight_kg, impedance, bc, output_format=args.output, profile=profile)
 
         if args.csv:
             append_csv(args.csv, device, variant, weight_kg, impedance, raw_hex, bc)
-            print(f"  ✓ saved to {args.csv}")
+            if args.output != "mac":
+                print(f"  ✓ saved to {args.csv}")
             stop_event.set()
 
     scanner = BleakScanner(callback)
@@ -502,6 +533,7 @@ def main() -> None:
     parser.add_argument("--height", type=float, metavar="CM",   help="Your height in cm (for BIA)")
     parser.add_argument("--age",    type=int,   metavar="YEARS", help="Your age in years (for BIA)")
     parser.add_argument("--sex",    metavar="male|female",       help="Your biological sex (for BIA)")
+    parser.add_argument("--output", choices=["default", "mac"], default="default", help="Output format for console")
     args = parser.parse_args()
 
     try:
