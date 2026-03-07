@@ -273,6 +273,9 @@ class BodyComposition:
     bmr:         float  # kcal/day
     body_age:    float  # years
     ideal_weight: float # kg
+    protein_kg:  float # kg
+    protein_pct: float # %
+    fat_mass_kg: float # kg
 
 
 def _clamp(v: float, lo: float, hi: float) -> float:
@@ -344,6 +347,11 @@ def calc_bia(profile: UserProfile, weight_kg: float, impedance: float) -> BodyCo
     else:
         ideal_weight = (H - 70.0) * 0.6
 
+    # 10. Protein
+    water_mass = (tfr * Wt) / 100.0
+    protein_kg = slm_raw - water_mass
+    protein_pct = (protein_kg / Wt) * 100.0
+
     return BodyComposition(
         weight_kg=round(Wt, 2),
         impedance=round(Z, 1),
@@ -357,6 +365,9 @@ def calc_bia(profile: UserProfile, weight_kg: float, impedance: float) -> BodyCo
         bmr=round(bmr, 0),
         body_age=round(body_age, 0),
         ideal_weight=round(ideal_weight, 1),
+        protein_kg=round(protein_kg, 2),
+        protein_pct=round(protein_pct, 1),
+        fat_mass_kg=round(fat_mass, 2),
     )
 
 # ---------------------------------------------------------------------------
@@ -367,7 +378,7 @@ CSV_HEADER = [
     "timestamp", "device", "variant",
     "weight_kg", "impedance_ohm", "raw_payload",
     "bmi", "bfr_%", "vfr", "tfr_%", "muscle_kg", "muscle_%", "bone_kg", "bmr_kcal",
-    "body_age", "ideal_weight_kg",
+    "body_age", "ideal_weight_kg", "protein_kg", "protein_%", "fat_mass_kg",
 ]
 
 
@@ -377,6 +388,8 @@ def _bia_row(bc: BodyComposition):
         bc.tfr if bc.tfr is not None else "",
         bc.muscle_kg, bc.muscle_pct,
         bc.bone_mass, bc.bmr, bc.body_age, bc.ideal_weight,
+        bc.protein_kg, bc.protein_pct,
+        bc.fat_mass_kg,
     ]
 
 
@@ -406,12 +419,13 @@ def print_reading(
             vfr_str = f"{bc.vfr:.1f}" if bc.vfr is not None else "—"
             tfr_str = f"{bc.tfr:.1f}%" if bc.tfr is not None else "—"
             print(f"{'BMI':<10}: {bc.bmi:.1f}")
-            print(f"{'Body Fat':<10}: {bc.bfr:.1f}%")
+            print(f"{'Body Fat':<10}: {bc.bfr:.1f}% ({bc.fat_mass_kg:.2f} kg)")
             print(f"{'Visc Fat':<10}: {vfr_str}")
             print(f"{'Water':<10}: {tfr_str}")
             print(f"{'Muscle':<10}: {bc.muscle_kg:.2f} kg ({bc.muscle_pct:.1f}%)")
             print(f"{'Bone Mass':<10}: {bc.bone_mass:.2f} kg")
             print(f"{'BMR':<10}: {bc.bmr:.0f} kcal")
+            print(f"{'Protein':<10}: {bc.protein_kg:.2f} kg ({bc.protein_pct:.1f}%)")
             print(f"{'Body Age':<10}: {bc.body_age:.0f}")
         return
 
@@ -424,9 +438,10 @@ def print_reading(
     if bc:
         vfr_str = f"{bc.vfr:.1f}" if bc.vfr is not None else "—"
         tfr_str = f"{bc.tfr:.1f}%" if bc.tfr is not None else "—"
-        print(f"  BMI      : {bc.bmi:.1f}      Body Fat : {bc.bfr:.1f}%")
+        print(f"  BMI      : {bc.bmi:.1f}      Body Fat : {bc.bfr:.1f}% ({bc.fat_mass_kg:.2f} kg)")
         print(f"  Visc Fat : {vfr_str}      Water    : {tfr_str}")
         print(f"  Muscle   : {bc.muscle_kg:.2f} kg ({bc.muscle_pct:.1f}%)")
+        print(f"  Protein  : {bc.protein_kg:.2f} kg ({bc.protein_pct:.1f}%)")
         print(f"  Bone Mass: {bc.bone_mass:.2f} kg   BMR: {bc.bmr:.0f} kcal")
         print(f"  Body Age : {bc.body_age:.0f}   Ideal Weight: {bc.ideal_weight:.1f} kg")
     print(f"{'─'*55}")
