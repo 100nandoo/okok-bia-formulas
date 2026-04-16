@@ -93,6 +93,56 @@ The `Scale Property` field is a bitmask that provides information about the meas
 | 5-6       | `10`  | Decimal precision (`01`: zero, `10`: two, `00`/`11`: one). |
 | 7         | `1`   | Measurement status (`1`: stable, `0`: unstable).           |
 
+## Supabase Integration
+
+The script can automatically upload readings to a Supabase database. To set this up:
+
+### 1. Create the table
+
+Run this SQL in the [Supabase SQL Editor](https://supabase.com/dashboard):
+
+```sql
+CREATE TABLE scale_readings (
+  id              bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  created_at      timestamptz DEFAULT now(),
+  device          text,
+  variant         text,
+  weight_kg       real,
+  impedance       real,
+  raw_payload     text,
+  bmi             real,
+  bfr             real,
+  vfr             real,
+  tfr             real,
+  muscle_kg       real,
+  muscle_pct      real,
+  bone_kg         real,
+  bmr_kcal        real,
+  body_age        real,
+  ideal_weight_kg real,
+  protein_kg      real,
+  protein_pct     real,
+  fat_mass_kg     real
+);
+```
+
+### 2. Configure credentials
+
+Create a `.env` file in the project root (already gitignored):
+
+```
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_KEY=your-service-role-key
+```
+
+### 3. Run
+
+```bash
+uv run okok_ble_reader.py --height 175 --age 30 --sex male --csv readings.csv
+```
+
+Readings will be saved to both the CSV file and Supabase.
+
 ## Contributing
 
 Contributions are welcome! If you have any information to add or corrections to make, please open an issue or submit a pull request.
