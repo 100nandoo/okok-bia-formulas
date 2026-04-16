@@ -28,15 +28,21 @@ Requirements: bleak
 # requires-python = ">=3.11"
 # dependencies = [
 #   "bleak",
+#   "supabase",
+#   "python-dotenv",
 # ]
 # ///
 
 from __future__ import annotations
 
+from dotenv import load_dotenv
+load_dotenv()
+
 import argparse
 import asyncio
 import csv
 import dataclasses
+import os
 import sys
 from datetime import datetime
 from typing import Optional
@@ -474,6 +480,58 @@ def append_csv(
         writer.writerow(row)
 
 # ---------------------------------------------------------------------------
+# Supabase
+# ---------------------------------------------------------------------------
+
+SUPABASE_TABLE = "scale_readings"
+
+def _init_supabase():
+    """Return a Supabase client if env vars are set, else None."""
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_KEY")
+    if not url or not key:
+        return None
+    from supabase import create_client
+    return create_client(url, key)
+
+
+def upload_supabase(
+    client,
+    device_name: str,
+    variant: str,
+    weight_kg: float,
+    impedance: Optional[float],
+    raw_hex: str,
+    bc: Optional[BodyComposition],
+) -> None:
+    row = {
+        "created_at": datetime.now().isoformat(),
+        "device": device_name,
+        "variant": variant,
+        "weight_kg": weight_kg,
+        "impedance": impedance,
+        "raw_payload": raw_hex,
+    }
+    if bc:
+        row.update({
+            "bmi": bc.bmi,
+            "bfr": bc.bfr,
+            "vfr": bc.vfr,
+            "tfr": bc.tfr,
+            "muscle_kg": bc.muscle_kg,
+            "muscle_pct": bc.muscle_pct,
+            "bone_kg": bc.bone_mass,
+            "bmr_kcal": bc.bmr,
+            "body_age": bc.body_age,
+            "ideal_weight_kg": bc.ideal_weight,
+            "protein_kg": bc.protein_kg,
+            "protein_pct": bc.protein_pct,
+            "fat_mass_kg": bc.fat_mass_kg,
+        })
+    client.table(SUPABASE_TABLE).insert(row).execute()
+
+
+# ---------------------------------------------------------------------------
 # Main BLE scan loop
 # ---------------------------------------------------------------------------
 
@@ -491,6 +549,12 @@ async def run(args: argparse.Namespace) -> None:
     elif args.output != "mac":
         print("No user profile provided — BIA body composition will be skipped.")
         print("Pass --height <cm> --age <years> --sex male|female to enable it.")
+
+    sb = _init_supabase()
+    if sb and args.output != "mac":
+        print("Supabase connected — readings will be uploaded.")
+    elif not sb and args.output != "mac":
+        print("Supabase not configured (set SUPABASE_URL and SUPABASE_KEY to enable).")
 
     if args.output != "mac":
         print("\nScanning for OKOK BLE scale advertisements…\n")
@@ -530,6 +594,16 @@ async def run(args: argparse.Namespace) -> None:
             append_csv(args.csv, device, variant, weight_kg, impedance, raw_hex, bc)
             if args.output != "mac":
                 print(f"  ✓ saved to {args.csv}")
+
+        if sb:
+            try:
+                upload_supabase(sb, device.name or device.address, variant, weight_kg, impedance, raw_hex, bc)
+                if args.output != "mac":
+                    print(f"  ✓ uploaded to Supabase")
+            except Exception as e:
+                print(f"  ✗ Supabase upload failed: {e}", file=sys.stderr)
+
+        if sb or args.csv:
             stop_event.set()
 
     scanner = BleakScanner(callback)
